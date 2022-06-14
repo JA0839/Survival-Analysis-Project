@@ -1,0 +1,495 @@
+/*******************************************
+*****************************************
+*Course: Survival Analysis - BIOS 6324	*
+*Assignment Final Project NLMS Data	*
+*	Programmer(s): Jessie Ausman	*
+*	Program Name: Final Project	*
+*	Save Program/Log/Output: C:\users\jessa\desktop\bios 6324\project\what i need	*
+*	Save Data Files: C:\users\jessa\desktop\bios 6324\project\what i need	*
+
+********************************************
+****************************************/
+
+
+/************************************ Part 0
+************************************/
+
+*read in data;
+libname bios "C:\users\jessa\desktop\bios 6324\project\what i need";
+
+*create temporary dataset;
+data Proj;
+set bios.eleven_new;
+run;
+
+
+*need to create censoring variable: censored if...
+- lost to follow up without inddea recorded;
+
+proc freq data=proj;
+tables cause113 follow inddea follow*inddea age/ missing;
+run;
+
+*restrict sample to only those 15+ years;
+data proj1;
+set proj;
+if age GE 15;
+run;
+
+*create variable indicating employment status:
+0 = unemployed
+1 = employed;
+data proj2;
+set proj1;
+if rcow = 5 then emp = 0;
+else if rcow in (1,2,3,4) then emp =
+1;
+else if missing(rcow) then emp = .;
+ 
+
+proc freq data=proj2; tables rcow*emp emp;
+run;
+
+*recode hispanic origin - hispanic vs. non- hispanic;
+data proj3;
+set proj2;
+if hisp in (1,2) then hisp1 = 1; else if hisp = 3 then hisp1 = 0;
+else if missing(hisp) then hisp1 = .;
+run;
+
+*recode educ - none/elementary/high/college;
+data proj4;
+set proj3;
+if educ = 01 then edu = 0;
+*none;
+else if educ in (02,03,04) then edu =
+1; *elementary;
+else if educ in (05,06,07,08) then edu
+= 2; *highschool;
+else if educ in (09,10,11,12,13,14) then edu = 3; *college;
+else if missing(educ) then edu = .;
+run;
+
+data proj4_1;
+set proj4;
+inddean = input(inddea, 8.); race1 = input(race, 8.); urban1 = input(urban, 8.); sex1 = input(sex, 8.);
+rcow1 = input(rcow, 8.);
+run;
+
+proc contents data=proj4_1 varnum;
+run;
+
+/**************************************** Part 1
+************************************/
+
+/*Descriptive analysis;*/
+
+
+**************************************
+*****************************************
+*urban --> 1 = urban / 2 = rural
+
+*
+*sex --> 1 = male / 2 = female
+
+*
+*race --> 1 = white / 2 = black / 3 = american indian / 4 = asian / 5 = other *
+*hisp1 --> 0 = non-hispanic / 1 = hispanic
+*
+ 
+run;
+ 
+*edu --> 0 = none / 1 = elementary / 2
+= highschool / 3 = college
+*
+ 
+
+/*ref = none*/
+ 
+edu (param=ref ref='0')
+
+emp (param=ref ref='0')
+ 
+**************************************
+****************************************;
+
+
+*includes chi-sq test for categorical vars;
+proc freq data=proj4;
+tables emp*sex emp*race emp*hisp1 emp*edu emp*urban/ chisq missing;
+run;
+
+*mean & std dev for age;
+proc sort data=proj4; by emp;
+run;
+
+proc means data=proj2; var age;
+by emp;
+run;
+
+*KW Chi-square test for cont. var;
+proc npar1way data=proj4 wilcoxon; class emp;
+var age;
+run;
+
+data proj5;
+set proj4;
+if rcow = 01 then cat = "Private industry";
+else if rcow = 02 then cat = "Government";
+else if rcow = 03 then cat = "Self- employed";
+else if rcow = 04 then cat = "Worked w/out pay";
+else if rcow = 05 then cat = "Never Worked";
+else if missing(rcow) then cat = " ";
+ 
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow1 (param=ref ref='5')/*ref = never worked*/;
+model follow*inddean(0) = emp rcow1 race1 hisp1 edu sex1 age urban1 / type3;
+output out=resid ressch= remp rrcow1 rrace1 rhisp1 redu rage rurban1;
+RUN;
+
+data events;
+set resid;
+if inddean = 1;
+run;
+
+proc rank data=events out=ranked ties=mean; var follow;
+ranks timerank;
+run;
+
+
+proc corr data=ranked nosimple;
+var remp rrcow1 rrace1 rhisp1 redu rage rurban1;
+with timerank;
+run;
+
+
+
+/****************************************** Part 3
+************************************/
+
+/*test interaction vs. no interaction model
+- Extended Cox PH*/
+ 
+run;
+
+ 
+*bar chart for rcow;
+proc sgplot data=proj5; vbar cat;
+ 
+
+data proj6;
+set proj4_1;
+ 
+run;
+
+
+/***************************************** Part 2
+************************************/
+
+/*check ph assumption*/
+PROC PHREG DATA=proj4_1;
+title "No-interaction Cox PH";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+/*ref = white*/	4;
+ 
+
+hisp_t = hisp1*follow; edu_t = edu*follow; age_t = age*follow;
+
+hisp_log = hisp1*log(follow); edu_log = edu*log(follow); age_log = age*log(follow);
+
+if rcow1 = 01 then rcow2 = 1;
+else if rcow1 = 02 then rcow2 = 2; else if rcow1 = 03 then rcow2 = 3; else if rcow1 in (04, 05) then rcow2 =
+ 
+
+
+run;
+ 
+else if missing(rcow1) then rcow2 = .;
+ 
+
+********************************************
+**************
+ 
+
+ 
+
+proc freq data=proj6; table rcow2 rcow1;
+run;
+
+
+
+/*MODEL 1*/
+PROC PHREG DATA=proj6;
+title "No-interaction Extended Cox
+PH";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+/*ref = white*/
+edu (param=ref ref='0')
+/*ref = none*/
+emp (param=ref ref='0')
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow2 (param=ref ref='4')/*ref = never worked/worked without pay*/;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1 hisp_t edu_t age_t/ type3;
+RUN;
+ 
+Compare AIC to determine which time function to use:
+
+time AIC = 841967.76
+
+logtime AIC = 905281.93
+
+-> Smaller AIC is better, so we will use time rather than
+logtime for time-dependent vars.
+********************************************
+**************;
+
+/*MODEL 3*/
+PROC PHREG DATA=proj6;
+title "Interaction Cox PH";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+/*ref = white*/
+edu (param=ref ref='0')
+/*ref = none*/
+emp (param=ref ref='0')
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow2 (param=ref ref='4')
+/*ref = never worked/worked without
+pay*/;
+ 
+
+
+/*MODEL 2*/
+PROC PHREG DATA=proj6;
+title "No-interaction Extended Cox PH
+- logtime";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+ 
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1
+hisp_t edu_t age_t edu_t*age_t edu_t*race1 emp*edu_t emp*age_t
+emp*race1
+rcow2*sex1/ type3;
+RUN;
+ 
+/*ref = white*/
+
+/*ref = none*/
+ 
+edu (param=ref ref='0') emp (param=ref ref='0')
+ 
+
+
+*run LR test interaction vs no interaction;
+DATA TEST;
+ 
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow2 (param=ref ref='4')/*ref = never worked/worked without pay*/;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1 hisp_log edu_log age_log/ type3;
+RUN;
+ 
+REDUCED = 841931.76;
+FULL = 806178.22;
+DF = 14;
+PVALUE = 1 - PROBCHI(REDUCED-FULL,DF);
+RUN;
+
+proc print data=test;
+run;
+
+*CONCLUSION: p-value significant --> Must assess interaction;
+ 
+
+
+
+/****************************************** Part 4
+************************************/
+ 
+
+
+
+
+RUN;
+
+DATA TEST;
+ 
+hisp_t edu_t age_t edu_t*age_t edu_t*race1 emp*edu_t emp*age_t rcow2*sex1/ type3;
+ 
+*drop any non-significant variables to find best fitting model;
+
+/*full model*/
+PROC PHREG DATA=proj6;
+title "Interaction Cox PH";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+/*ref = white*/
+edu (param=ref ref='0')
+ 
+REDUCED = 806181.61;
+FULL = 806178.22;
+DF = 4;
+PVALUE = 1 - PROBCHI(REDUCED-FULL,DF);
+RUN;
+
+proc print data=test;
+run;
+
+****insignificant p-value so we can drop emp*race1*****;
+ 
+/*ref = none*/
+emp (param=ref ref='0')
+ 
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow2 (param=ref ref='4')
+/*ref = never worked/worked without
+pay*/;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1
+hisp_t edu_t age_t edu_t*age_t edu_t*race1 emp*edu_t emp*age_t
+emp*race1
+rcow2*sex1/ type3;
+RUN;
+
+***************drop race1*emp since it is most insignificant & perform LR test*****************;
+
+/*ALT MODEL 1*/
+PROC PHREG DATA=proj6;
+title "Interaction Cox PH";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+/*ref = white*/
+edu (param=ref ref='0')
+/*ref = none*/
+emp (param=ref ref='0')
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow2 (param=ref ref='4')
+/*ref = never worked/worked without
+pay*/;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1
+ 
+
+***************drop age_t*emp since it is most insignificant & perform LR test*****************;
+
+
+/*ALT MODEL 2*/
+PROC PHREG DATA=proj6;
+title "Interaction Cox PH";
+class	hisp1 (param=ref ref='0')
+/*ref = nonhispanic*/
+race1 (param=ref ref='1')
+/*ref = white*/
+edu (param=ref ref='0')
+/*ref = none*/
+emp (param=ref ref='0')
+/*ref = unemployed*/
+sex1 (param=ref ref='1')
+/*ref = male*/
+urban1 (param=ref ref='2')/*ref = rural*/
+rcow2 (param=ref ref='4')
+/*ref = never worked/worked without
+pay*/;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1
+hisp_t edu_t age_t edu_t*age_t edu_t*race1 emp*edu_t
+rcow2*sex1/ type3;
+RUN;
+
+
+DATA TEST;
+REDUCED = 806183.43;
+FULL = 806181.61;
+DF = 1;
+PVALUE = 1 - PROBCHI(REDUCED-FULL,DF);
+RUN;
+
+proc print data=test;
+ 
+run;
+
+****insignificant p-value so we can drop emp*age_t*****;
+
+********************************************
+*************************************** all remaining interaction terms are significant at 95% level of confidence. only predictor remaining in the model with an insignificant p-value is
+emp, however emp is a component of several significant interaction terms so
+it cannot be dropped from the model
+--> ALT MODEL 2 is our
+ 
+urban1 rcow2;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1
+hisp_t edu_t age_t edu_t*age_t edu_t*race1 emp*edu_t
+rcow2*sex1/
+dist=llogistic;
+probplot;
+RUN;
+
+/*probplots could not be produced --> stick with ALT MODEL 2 as final model*/
+ 
+chosen model
+********************************************
+**************************************;
+
+ 
+
+
+/****************************************** Part 5
+************************************/
+
+/*test parametric models for best fitting model - only test parametric models that do NOT
+rely on the PH assumption (lognormal and loglogistic)*/
+
+
+/*ALT MODEL 3*/
+PROC LIFEREG DATA=proj6;
+title "Parametric Cox - Lognormal"; class	hisp1
+race1 edu emp sex1 urban1 rcow2;
+model follow*inddean(0) = emp rcow2 race1 hisp1 edu sex1 age urban1
+hisp_t edu_t age_t edu_t*age_t edu_t*race1 emp*edu_t
+rcow2*sex1/ dist=lnormal;
+ 
+/****************************************** Part 6
+************************************/
+
+proc surveyselect data=proj6 out = random_sample method = srs
+samprate = 0.25
+seed = 1;
+run;
+
+proc contents data=random_sample varnum;
+run;
+
+PROC LIFETEST DATA=random_sample METHOD=KM PLOTS=(S,LLS);
+TIME follow*inddean(0); STRATA emp;
+RUN;
+
+PROC LIFETEST DATA=random_sample METHOD=KM PLOTS=(S,LLS);
+TIME follow*inddean(0); STRATA rcow2;
+RUN;
+ 
+probplot;
+RUN;
+
+
